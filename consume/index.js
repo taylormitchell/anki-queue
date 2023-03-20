@@ -1,18 +1,16 @@
-import fs from "fs";
-import path from "path";
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
 
-const token = JSON.parse(fs.readFileSync(path.join(process.env.HOME, ".secrets.json"))).QUEUE_TOKEN;
+const secret = process.env.QUEUE_SECRET;
 const queueURL = process.env.QUEUE_URL || "http://localhost:3000/queue";
 const ankiURL = process.env.ANKI_URL || "http://localhost:8765";
 const version = 6;
 
-// get from queue
-
 while (true) {
   const res = await axios.get(queueURL, {
     headers: {
-      Authorization: token,
+      Authorization: secret,
     },
   });
   if (!res.data) {

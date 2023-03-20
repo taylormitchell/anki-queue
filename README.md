@@ -8,17 +8,19 @@ AnkiConnect is only available when Anki is open. This allows you to queue up act
 Start the queue server
 
 ```
-node queue/index.js
+node queue/server.js
 ```
 
-Post an anki action to it
+Enqueue and dequeue an action
 
 ```
-curl -X POST -H "Content-Type: application/json" -d '{"action": "deckNames"}' http://localhost:3000/queue
+source ./scripts/enqueue.sh '{"action": "deckNames"}'
+source ./scripts/dequeue.sh
 ```
 
-Consume the action and send to ankiconnect
+Enqueue, dequeue, and send to Anki
 
 ```
-node queue/index.js
+source ./scripts/enqueue.sh '{"action": "deckNames"}'
+node ./consume/index.js
 ```
