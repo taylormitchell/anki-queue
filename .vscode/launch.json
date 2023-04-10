@@ -5,11 +5,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "node",
+      "name": "queue",
+      "type": "node-terminal",
       "request": "launch",
-      "name": "Launch Program",
       "skipFiles": ["<node_internals>/**"],
-      "program": "${file}"
+      "cwd": "${workspaceFolder}/queue",
+      "command": "npm run dev"
+    },
+    {
+      "name": "consume",
+      "type": "node-terminal",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}/consume",
+      "command": "npm start"
     }
   ]
 }

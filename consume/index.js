@@ -8,7 +8,8 @@ const ankiURL = process.env.ANKI_URL || "http://localhost:8765";
 const version = 6;
 
 while (true) {
-  const res = await axios.get(queueURL, {
+  // use DELETE to pop from queue
+  const res = await axios.delete(queueURL, {
     headers: {
       Authorization: secret,
     },
