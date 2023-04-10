@@ -1,7 +1,7 @@
 # Anki Queue
 
-This is a simple queue server for anki. It allows you to queue up anki actions and then consume them.
-AnkiConnect is only available when Anki is open. This allows you to queue up actions and then consume them when Anki is open.
+A queue for Anki actions. Anki has an API with the AnkiConnect plugin, but it is only available when Anki is open.
+This allows you to queue up actions and then consume them when Anki is open.
 
 ## Basic Usage
 
