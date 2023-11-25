@@ -28,13 +28,13 @@ node queue/server.js
 Enqueue and dequeue an action
 
 ```
-source ./scripts/enqueue.sh '{"action": "deckNames"}'
-source ./scripts/dequeue.sh
+bash ./scripts/enqueue.sh '{"action": "deckNames"}'
+bash ./scripts/dequeue.sh
 ```
 
 Enqueue, dequeue, and send to Anki
 
 ```
-source ./scripts/enqueue.sh '{"action": "deckNames"}'
+bash ./scripts/enqueue.sh '{"action": "deckNames"}'
 node ./consume/index.js
 ```

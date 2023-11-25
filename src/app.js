@@ -1,11 +1,12 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
-const dotenv = require("dotenv");
-dotenv.config();
-const queue = require("./queue");
+const { createDynamoDBClient, createLocalFileClient } = require("./queue");
+
+const env = process.env.ENV || "dev";
+const queue = env === "dev" ? createLocalFileClient() : createDynamoDBClient();
 
 const app = express();
-const port = process.env.PORT || 3000;
 const secret = process.env.QUEUE_SECRET;
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -86,6 +87,4 @@ app.delete("/queue", (req, res) => {
   res.json(queue.pop());
 });
 
-app.listen(port, () => {
-  console.log(`Queue API listening at http://localhost:${port}`);
-});
+module.exports = app;

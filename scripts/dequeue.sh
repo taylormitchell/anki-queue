@@ -1,2 +1,2 @@
 source .env
-curl -H "Authorization: $QUEUE_SECRET" $QUEUE_URL
+curl -X DELETE -H "Authorization: $QUEUE_SECRET" $QUEUE_URL
