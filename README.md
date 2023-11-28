@@ -38,3 +38,9 @@ Enqueue, dequeue, and send to Anki
 bash ./scripts/enqueue.sh '{"action": "deckNames"}'
 node ./consume/index.js
 ```
+
+## Todo
+
+- [ ] Add authentication to the server
+- [ ] Connect gpt to it
+- [ ] Add cron job to consume queue periodically
