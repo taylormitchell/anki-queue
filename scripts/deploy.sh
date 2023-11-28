@@ -1,16 +1,16 @@
 #!/bin/bash
+set -e
 
 # Variables
 source .env
-tableName=$QUEUE_TABLE_NAME
+tableName=$TABLE_NAME
 region="us-east-1"
 accountID="504625865506"
 lambdaFunctionName="AnkiQueue"
 lambdaRoleName="AnkiQueueRole"
-lambdaRuntime="nodejs14.x"
-zipFilePath="/path/to/your/zip/file" # Path to the zipped file of your Express app
+zipFilePath="build.zip" # Path to the zipped file of your Express app
 
-# 1. Create DynamoDB Table
+# # Create DynamoDB Table
 if aws dynamodb describe-table --table-name $tableName --region $region 2>&1 | grep -q 'ResourceNotFoundException'
 then
     echo "Table $tableName does not exist. Creating..."
@@ -30,7 +30,7 @@ else
 fi
 
 
-# 2. Create IAM Role for Lambda
+# Create IAM Role for Lambda
 trustPolicy='{
     "Version": "2012-10-17",
     "Statement": [
@@ -57,7 +57,7 @@ else
 fi
 
 # 3. Attach Custom Policy to Lambda Role
-policyName="${tableName}DynamoDBReadWriteAccess"
+policyName="${tableName}Policy"
 policyDocument='{
     "Version": "2012-10-17",
     "Statement": [
@@ -72,6 +72,16 @@ policyDocument='{
                 "dynamodb:UpdateItem"
             ],
             "Resource": "arn:aws:dynamodb:'$region':'$accountID':table/'$tableName'"
+        },
+        {
+            "Sid": "CloudWatchLogsAccess",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:'$region':'$accountID':log-group:/aws/lambda/'$lambdaFunctionName':*"
         }
     ]
 }'
@@ -87,21 +97,40 @@ else
     aws iam attach-role-policy \
         --role-name $lambdaRoleName \
         --policy-arn $policyArn
+    # 
 fi
 
+# Build the project
+rm $zipFilePath
+cd src && npm install
+# zip src and .env
+zip -r ../$zipFilePath * ../.env
+cd ..
 
-# 4. Create the Lambda Function
-# aws lambda create-function \
-#     --function-name $lambdaFunctionName \
-#     --zip-file fileb://$zipFilePath \
-#     --handler app.handler \
-#     --runtime $lambdaRuntime \
-#     --role arn:aws:iam::$accountID:role/$lambdaRoleName \
-#     --region $region
-
-
-# aws dynamodb put-item \
-#     --table-name AnkiQueue \
-#     --item \
-#         '{"id": {"S": "unique-id"}, "createdAt": {"N": "1700930073"}, "data": {"M": {"Front": {"S": "test"}, "Back": {"S": "test"}}}}' \
-#     --return-consumed-capacity TOTAL
+# Create the Lambda Function
+if aws lambda get-function --function-name $lambdaFunctionName 2>&1 | grep -q 'ResourceNotFoundException'
+then
+    echo "Lambda function $lambdaFunctionName does not exist. Creating..."
+    aws lambda create-function \
+        --function-name $lambdaFunctionName \
+        --zip-file fileb://$zipFilePath \
+        --handler serverless.handler \
+        --runtime nodejs14.x \
+        --role arn:aws:iam::$accountID:role/$lambdaRoleName \
+        --region $region
+    aws lambda create-function-url-config \
+        --function-name $lambdaFunctionName \
+        --auth-type NONE
+    aws lambda add-permission \
+        --function-name $lambdaFunctionName \
+        --statement-id FunctionURLAllowPublicAccess \
+        --action lambda:InvokeFunctionUrl \
+        --principal '*' \
+        --function-url-auth-type NONE
+else
+    echo "Lambda function $lambdaFunctionName already exists. Updating..."
+    aws lambda update-function-code \
+        --function-name $lambdaFunctionName \
+        --zip-file fileb://$zipFilePath \
+        --region $region
+fi

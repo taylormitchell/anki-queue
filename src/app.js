@@ -3,26 +3,69 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const { createDynamoDBClient, createLocalFileClient } = require("./queue");
 
-const env = process.env.ENV || "dev";
-const queue = env === "dev" ? createLocalFileClient() : createDynamoDBClient();
+// Create queue client
+const secret = process.env.QUEUE_SECRET;
+const env = process.env.ENV || "prod";
+console.log(`ENV: ${env}`);
+let queue;
+if (env === "dev") {
+  queue = createLocalFileClient(process.env.FILE_NAME || "queue.json");
+} else {
+  if (!process.env.TABLE_NAME) {
+    console.error("TABLE_NAME env var is required for local development");
+    process.exit(1);
+  }
+  queue = createDynamoDBClient(process.env.TABLE_NAME);
+}
 
 const app = express();
-const secret = process.env.QUEUE_SECRET;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/index.html");
+async function getHtml() {
+  const items = await queue.get();
+  // Return index w/ root replaced with queue
+  const html = `
+    <html>
+      <head>
+        <title>Queue</title>
+      </head>
+      <body>
+        <h1>Queue</h1>
+        <ul>
+          ${items.map((item) => `<li>${JSON.stringify(item)}</li>`)}
+        </ul>
+          <form action="/" method="POST">
+          <div>
+          <label for="question">Q:</label>
+          <input type="text" name="question" id="question" />
+        </div>
+        <div>
+          <label for="answer">A:</label>
+          <input type="text" name="answer" id="answer" />
+        </div>
+        <input type="submit" value="Create" />
+        <button type="button" onclick="window.location.href='/queue/flush'">Flush</button>
+      </form>
+      </body>
+    </html>
+  `;
+  return html;
+}
+
+app.get("/", async (req, res) => {
+  const html = await getHtml();
+  return res.send(html);
 });
 
-app.post("/", (req, res) => {
+app.post("/", async (req, res) => {
   const { question, answer, source } = req.body;
   if (!question || !answer) {
     res.status(400).send("Bad request");
     return;
   }
-  queue.push({
+  await queue.push({
     action: "addNote",
     version: 6,
     params: {
@@ -37,7 +80,8 @@ app.post("/", (req, res) => {
       },
     },
   });
-  res.sendFile(__dirname + "/index.html");
+  const html = await getHtml();
+  return res.send(html);
 });
 
 // Middleware to check for secret
@@ -50,6 +94,7 @@ app.use((req, res, next) => {
 });
 
 app.post("/queue", (req, res) => {
+  console.log("POST /queue");
   let note = {};
   if (!req.body) {
     res.status(400).send("Bad request");
@@ -74,16 +119,27 @@ app.post("/queue", (req, res) => {
       },
     };
   }
+  console.log(`Pushing item to queue: ${JSON.stringify(note)}`);
   queue.push(note);
   res.json(note);
 });
 
-app.get("/queue", (req, res) => {
-  res.json(queue.get());
+app.use("/queue/flush", async (req, res) => {
+  console.log("POST /queue/flush");
+  const items = await queue.flush();
+  res.send(items);
+});
+
+app.get("/queue", async (req, res) => {
+  console.log("GET /queue");
+  const items = await queue.get();
+  console.log(`Queue: ${JSON.stringify(items)}`);
+  res.json(items);
 });
 
 // pop from queue
 app.delete("/queue", (req, res) => {
+  console.log("DELETE /queue");
   res.json(queue.pop());
 });
 

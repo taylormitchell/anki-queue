@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const defaultUserId = "default";
 
-function createDynamoDBClient() {
+function createDynamoDBClient(tableName) {
   const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
   const {
     PutCommand,
@@ -12,21 +12,20 @@ function createDynamoDBClient() {
   } = require("@aws-sdk/lib-dynamodb");
   const client = new DynamoDBClient({});
   const docClient = DynamoDBDocumentClient.from(client);
-  const tableName = process.env.QUEUE_TABLE_NAME;
-  return {
+  const queue = {
     get: async (userId = defaultUserId) => {
       const command = new QueryCommand({
         TableName: tableName,
-        KeyConditionExpression: "id = :id",
+        KeyConditionExpression: "userId = :userId",
         ExpressionAttributeValues: {
-          ":id": userId,
+          ":userId": userId,
         },
       });
       const res = await docClient.send(command);
+      console.log(JSON.stringify({ command, res }));
       return res.Items;
     },
     push: async (item, userId = defaultUserId) => {
-      console.log(`Pushing item to queue: ${JSON.stringify(item)}`);
       const command = new PutCommand({
         TableName: tableName,
         Item: {
@@ -36,11 +35,11 @@ function createDynamoDBClient() {
         },
       });
       const res = await docClient.send(command);
-      console.log(`Response from DynamoDB: ${JSON.stringify(res)}`);
+      console.log(JSON.stringify({ command, res }));
     },
     pop: async (userId = defaultUserId) => {
       console.log("Popping item from queue");
-      const command = new QueryCommand({
+      const queryCommand = new QueryCommand({
         TableName: tableName,
         KeyConditionExpression: "userId = :userId",
         ExpressionAttributeValues: {
@@ -49,7 +48,7 @@ function createDynamoDBClient() {
         Limit: 1,
       });
       const resPop = await docClient.send(command);
-      console.log(`Response from DynamoDB get latest item: ${JSON.stringify(resPop)}`);
+      console.log(JSON.stringify({ command: queryCommand, res: resPop }));
       const item = resPop.Items[0];
       // Delete the item from the queue
       const deleteCommand = new DeleteCommand({
@@ -60,17 +59,34 @@ function createDynamoDBClient() {
         },
       });
       const resDelete = await docClient.send(deleteCommand);
-      console.log(`Response from DynamoDB delete item: ${JSON.stringify(resDelete)}`);
-      console.log(`Popped item from queue: ${JSON.stringify(item)}`);
+      console.log(JSON.stringify({ command: deleteCommand, res: resDelete }));
       return item.data;
     },
+    flush: async (userId = defaultUserId) => {
+      console.log("Flushing queue");
+      const items = await queue.get(userId);
+      Promise.all(
+        items.map((item) => {
+          const deleteCommand = new DeleteCommand({
+            TableName: tableName,
+            Key: {
+              userId: item.userId,
+              createdAt: item.createdAt,
+            },
+          });
+          const resDelete = docClient.send(deleteCommand);
+          console.log(JSON.stringify({ command: deleteCommand, res: resDelete }));
+        })
+      );
+      return items;
+    },
   };
+  return queue;
 }
 
-function createLocalFileClient() {
+function createLocalFileClient(dbPath) {
   const fs = require("fs");
   const path = require("path");
-  const dbPath = process.env.QUEUE_FILE || path.join(__dirname, "queue.json");
 
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, "[]");
